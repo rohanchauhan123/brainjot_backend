@@ -62,7 +62,14 @@ app.use((req, res, next) => {
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) callback(null, true);
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || 
+                      /\.vercel\.app$/i.test(origin) || 
+                      origin.startsWith('https://brainjot');
+    if (isAllowed) callback(null, true);
     else callback(new Error('CORS not allowed'));
   },
   credentials: true,
@@ -81,6 +88,8 @@ app.use((_req, res, next) => {
   next();
 });
 
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+
 const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
@@ -89,8 +98,8 @@ const sessionMiddleware = session({
   store: MongoStore.create({ mongoUrl: MONGODB_URI }),
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 });
