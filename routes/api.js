@@ -268,6 +268,7 @@ const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 500,
   keyGenerator: (req) => req.session?.userId || req.ip,
+  validate: { ip: false },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -281,6 +282,7 @@ const exportLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   keyGenerator: (req) => req.session?.userId || req.ip,
+  validate: { ip: false },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
