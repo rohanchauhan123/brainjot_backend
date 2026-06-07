@@ -18,7 +18,12 @@ const adminRouter = require('./routes/admin');
 const PORT = process.env.PORT || 3001;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) throw new Error('SESSION_SECRET environment variable is required');
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/brainjot';
+const MONGODB_URI = process.env.MONGODB_URI || 
+                    process.env.MONGO_URL || 
+                    process.env.MONGODB_URL || 
+                    process.env.MONGO_PRIVATE_URL || 
+                    process.env.DATABASE_URL || 
+                    'mongodb://127.0.0.1:27017/brainjot';
 
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())

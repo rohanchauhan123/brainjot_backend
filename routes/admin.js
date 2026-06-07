@@ -246,7 +246,7 @@ router.get('/system', async (req, res) => {
     );
 
     const envHealth = {
-      MONGODB_URI:         !!process.env.MONGODB_URI,
+      MONGODB_URI:         !!(process.env.MONGODB_URI || process.env.MONGO_URL || process.env.MONGODB_URL || process.env.MONGO_PRIVATE_URL || process.env.DATABASE_URL),
       SESSION_SECRET:      !!process.env.SESSION_SECRET,
       ADMIN_EMAILS:        !!process.env.ADMIN_EMAILS,
       R2_ACCOUNT_ID:       !!process.env.R2_ACCOUNT_ID,
