@@ -127,7 +127,7 @@ if (!process.env.R2_ACCOUNT_ID) {
 const FRONTEND_DIST = path.join(__dirname, 'public');
 if (fs.existsSync(FRONTEND_DIST)) {
   app.use(express.static(FRONTEND_DIST));
-  app.get('/{*path}', (_req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
+  app.get('*', (_req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
 }
 
 // ── Global error handler — must be last middleware ────────────────
