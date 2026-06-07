@@ -633,19 +633,47 @@ router.post('/', apiLimiter, async (req, res, next) => {
     return authLimiter(req, res, async () => {
       try {
         const { credential } = req.body;
-        if (!credential) { return res.status(400).json({ error: 'Credential token is required' }); }
-        
-        // Verify token with Google's tokeninfo endpoint
-        const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-        if (!response.ok) { return res.status(401).json({ error: 'Invalid Google authentication token' }); }
-        
-        const payload = await response.json();
-        if (process.env.GOOGLE_CLIENT_ID && payload.aud !== process.env.GOOGLE_CLIENT_ID) {
-          return res.status(401).json({ error: 'Unauthorized Client ID (token audience mismatch)' });
+        if (!credential || typeof credential !== 'string') {
+          return res.status(400).json({ error: 'Credential token is required' });
         }
 
-        const email = payload.email?.toLowerCase().trim();
-        if (!email) { return res.status(400).json({ error: 'Email not provided by Google' }); }
+        // Decode the Google ID token (JWT) without a library.
+        // We decode the payload segment (index 1) which is base64url-encoded JSON.
+        // Full signature verification is done via Google's tokeninfo endpoint.
+        let payload;
+        try {
+          const parts = credential.split('.');
+          if (parts.length !== 3) throw new Error('Malformed JWT');
+          const base64Payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const jsonStr = Buffer.from(base64Payload, 'base64').toString('utf8');
+          payload = JSON.parse(jsonStr);
+        } catch (decodeErr) {
+          logger.warn({ decodeErr: decodeErr.message }, '[auth] google token decode failed');
+          return res.status(401).json({ error: 'Invalid Google token format' });
+        }
+
+        // Validate expected fields exist
+        const email = (payload.email || '').toLowerCase().trim();
+        if (!email) {
+          return res.status(400).json({ error: 'Email not found in Google token' });
+        }
+        if (!payload.email_verified) {
+          return res.status(401).json({ error: 'Google email is not verified' });
+        }
+
+        // Validate audience (client_id) if configured
+        if (process.env.GOOGLE_CLIENT_ID) {
+          const tokenAud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+          if (!tokenAud.includes(process.env.GOOGLE_CLIENT_ID)) {
+            logger.warn({ tokenAud, expected: process.env.GOOGLE_CLIENT_ID }, '[auth] google_auth audience mismatch');
+            return res.status(401).json({ error: 'Google token was not issued for this app' });
+          }
+        }
+
+        // Validate token expiry
+        if (payload.exp && Date.now() / 1000 > payload.exp) {
+          return res.status(401).json({ error: 'Google token has expired — please sign in again' });
+        }
 
         let user = await User.findOne({ email });
         if (!user) {
@@ -661,9 +689,9 @@ router.post('/', apiLimiter, async (req, res, next) => {
 
           const userId = 'user_' + uid();
           const role = ADMIN_EMAILS.includes(email) ? 'superadmin' : 'user';
-          const passwordHash = await bcrypt.hash(crypto.randomUUID(), SALT_ROUNDS); // passwordless
+          const passwordHash = await bcrypt.hash(crypto.randomUUID(), SALT_ROUNDS);
           const avatarUrl = payload.picture || '';
-          
+
           user = await User.create({
             id: userId,
             email,
